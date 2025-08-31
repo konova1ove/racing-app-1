@@ -567,3 +567,186 @@ body {
     0%, 100% { transform: scale(1); }
     50% { transform: scale(1.05); }
 }
+
+/* Map Styles */
+#map-container {
+    flex: 1;
+    width: 100%;
+    height: 100%;
+    min-height: 300px;
+    border-radius: 8px;
+    overflow: hidden;
+    position: relative;
+}
+
+/* Custom map markers */
+.route-marker {
+    background: none;
+    border: none;
+    font-size: 24px;
+    text-align: center;
+    line-height: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.start-marker {
+    background: rgba(76, 175, 80, 0.9);
+    border: 2px solid #4CAF50;
+}
+
+.end-marker {
+    background: rgba(255, 152, 0, 0.9);
+    border: 2px solid #FF9800;
+}
+
+.user-location-marker {
+    background: rgba(33, 150, 243, 0.9);
+    border: 2px solid #2196F3;
+    border-radius: 50%;
+    font-size: 16px;
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0% {
+        box-shadow: 0 0 0 0 rgba(33, 150, 243, 0.7);
+    }
+    70% {
+        box-shadow: 0 0 0 10px rgba(33, 150, 243, 0);
+    }
+    100% {
+        box-shadow: 0 0 0 0 rgba(33, 150, 243, 0);
+    }
+}
+
+/* Leaflet control customization */
+.leaflet-control-zoom {
+    border: none !important;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15) !important;
+}
+
+.leaflet-control-zoom a {
+    background-color: var(--tg-theme-button-color, #3390ec) !important;
+    color: white !important;
+    border: none !important;
+}
+
+.leaflet-control-zoom a:hover {
+    background-color: var(--tg-theme-link-color, #2c7cd1) !important;
+}
+
+/* Map loading overlay */
+.map-loading {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(255, 255, 255, 0.9);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    font-size: 1rem;
+    color: var(--tg-theme-text-color, #000);
+}
+
+/* Route preview improvements */
+.route-info {
+    padding: 1rem;
+    background: var(--tg-theme-secondary-bg-color, #f8f9fa);
+    border-top: 1px solid var(--tg-theme-hint-color, #e0e0e0);
+}
+
+/* GPS status indicator */
+.gps-status {
+    position: fixed;
+    top: 70px;
+    left: 1rem;
+    right: 1rem;
+    padding: 8px 16px;
+    background: rgba(255, 152, 0, 0.9);
+    color: white;
+    border-radius: 20px;
+    text-align: center;
+    font-size: 0.9rem;
+    font-weight: 500;
+    z-index: 2000;
+    transform: translateY(-100%);
+    transition: transform 0.3s ease;
+}
+
+.gps-status.show {
+    transform: translateY(0);
+}
+
+.gps-status.good {
+    background: rgba(76, 175, 80, 0.9);
+}
+
+.gps-status.warning {
+    background: rgba(255, 152, 0, 0.9);
+}
+
+.gps-status.error {
+    background: rgba(244, 67, 54, 0.9);
+}
+
+/* Achievement Notifications */
+.achievement-notification {
+    position: fixed;
+    top: 80px;
+    left: 50%;
+    transform: translateX(-50%) translateY(-100px);
+    background: linear-gradient(135deg, #FFD700 0%, #FFA000 100%);
+    color: #333;
+    padding: 16px 20px;
+    border-radius: 16px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+    z-index: 10000;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-width: 280px;
+    max-width: 90vw;
+    opacity: 0;
+    transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.achievement-notification.show {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+}
+
+.achievement-icon {
+    font-size: 32px;
+    flex-shrink: 0;
+}
+
+.achievement-content {
+    flex: 1;
+}
+
+.achievement-title {
+    font-size: 16px;
+    font-weight: 700;
+    margin-bottom: 4px;
+}
+
+.achievement-description {
+    font-size: 14px;
+    opacity: 0.8;
+    font-weight: 500;
+}
+
+/* Results screen improvements */
+.result-stat .grade {
+    font-size: 0.8rem;
+    margin-left: 8px;
+    font-weight: 600;
+    opacity: 0.8;
+}

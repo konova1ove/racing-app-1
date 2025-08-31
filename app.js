@@ -5,6 +5,7 @@ class RacingApp {
         this.user = null;
         this.currentRoute = null;
         this.driveTracker = null;
+        this.locationWatchId = null;
         
         // Initialize Telegram WebApp
         this.telegram = window.Telegram?.WebApp || {};
@@ -148,21 +149,124 @@ class RacingApp {
     async getCurrentLocation() {
         return new Promise((resolve, reject) => {
             if (!navigator.geolocation) {
-                reject(new Error('Geolocation not supported'));
+                reject(new Error('Geolocation not supported by this device'));
                 return;
             }
 
+            // Check for permission first
+            if (navigator.permissions) {
+                navigator.permissions.query({ name: 'geolocation' }).then((result) => {
+                    if (result.state === 'denied') {
+                        reject(new Error('Location permission denied. Please enable location access in your browser settings.'));
+                        return;
+                    }
+                });
+            }
+
+            const options = {
+                enableHighAccuracy: true,
+                timeout: 15000,
+                maximumAge: 60000 // 1 minute cache
+            };
+
             navigator.geolocation.getCurrentPosition(
                 (position) => {
+                    console.log('📍 GPS Position:', position.coords);
                     resolve({
                         lat: position.coords.latitude,
-                        lng: position.coords.longitude
+                        lng: position.coords.longitude,
+                        accuracy: position.coords.accuracy,
+                        speed: position.coords.speed,
+                        timestamp: position.timestamp
                     });
                 },
-                (error) => reject(error),
-                { enableHighAccuracy: true, timeout: 10000, maximumAge: 300000 }
+                (error) => {
+                    console.error('❌ GPS Error:', error);
+                    let errorMessage = 'Failed to get location: ';
+                    switch (error.code) {
+                        case error.PERMISSION_DENIED:
+                            errorMessage += 'Permission denied. Please enable location access.';
+                            break;
+                        case error.POSITION_UNAVAILABLE:
+                            errorMessage += 'Position unavailable. Check your GPS signal.';
+                            break;
+                        case error.TIMEOUT:
+                            errorMessage += 'Request timeout. Try again.';
+                            break;
+                        default:
+                            errorMessage += error.message;
+                    }
+                    reject(new Error(errorMessage));
+                },
+                options
             );
         });
+    }
+
+    // Start continuous location tracking for driving
+    startLocationTracking() {
+        if (this.locationWatchId) {
+            navigator.geolocation.clearWatch(this.locationWatchId);
+        }
+
+        const options = {
+            enableHighAccuracy: true,
+            timeout: 5000,
+            maximumAge: 1000 // 1 second cache max during driving
+        };
+
+        this.locationWatchId = navigator.geolocation.watchPosition(
+            (position) => {
+                const locationData = {
+                    lat: position.coords.latitude,
+                    lng: position.coords.longitude,
+                    accuracy: position.coords.accuracy,
+                    speed: position.coords.speed || 0,
+                    heading: position.coords.heading,
+                    timestamp: position.timestamp
+                };
+
+                // Update drive tracker if active
+                if (this.driveTracker && this.driveTracker.isActive) {
+                    this.driveTracker.updatePosition(locationData);
+                }
+
+                // Update UI
+                this.updateLocationUI(locationData);
+            },
+            (error) => {
+                console.error('❌ Location tracking error:', error);
+                this.handleLocationError(error);
+            },
+            options
+        );
+
+        console.log('🔄 Location tracking started');
+    }
+
+    stopLocationTracking() {
+        if (this.locationWatchId) {
+            navigator.geolocation.clearWatch(this.locationWatchId);
+            this.locationWatchId = null;
+            console.log('🔄 Location tracking stopped');
+        }
+    }
+
+    updateLocationUI(locationData) {
+        // Update current speed display
+        const speedEl = document.getElementById('current-speed');
+        if (speedEl && locationData.speed !== null) {
+            const speedKmh = Math.round((locationData.speed || 0) * 3.6); // m/s to km/h
+            speedEl.textContent = speedKmh;
+        }
+    }
+
+    handleLocationError(error) {
+        if (error.code === error.PERMISSION_DENIED) {
+            this.showError('Location access denied. Please enable GPS permissions.');
+        } else if (error.code === error.POSITION_UNAVAILABLE) {
+            this.showError('GPS signal lost. Make sure you have a clear view of the sky.');
+        }
     }
 
     async geocodeAddress(address) {
@@ -243,6 +347,9 @@ class RacingApp {
         console.log('🏁 Starting drive...');
         this.showScreen('drive');
         
+        // Start GPS tracking
+        this.startLocationTracking();
+        
         if (window.DriveTracker) {
             this.driveTracker = new window.DriveTracker(this.currentRoute);
             this.driveTracker.start();
@@ -254,7 +361,7 @@ class RacingApp {
         }
         
         if (window.audio) {
-            window.audio.segmentStart();
+            window.audio.driveStart();
         }
     }
 
@@ -265,6 +372,10 @@ class RacingApp {
         if (!confirmed) return;
         
         console.log('🛑 Stopping drive...');
+        
+        // Stop GPS tracking
+        this.stopLocationTracking();
+        
         const results = this.driveTracker.finish();
         await this.saveDriveResults(results);
         this.showResults(results);
@@ -328,17 +439,56 @@ class RacingApp {
     showResults(results) {
         this.showScreen('results');
         
+        // Update basic stats
         const scoreEl = document.getElementById('final-score');
         const accuracyEl = document.getElementById('final-accuracy');
         const distanceEl = document.getElementById('final-distance');
         const segmentsEl = document.getElementById('final-segments');
         const timeEl = document.getElementById('final-time');
         
-        if (scoreEl) scoreEl.textContent = results.score || 0;
-        if (accuracyEl) accuracyEl.textContent = `${Math.round(results.accuracy || 0)}%`;
+        if (scoreEl) scoreEl.textContent = window.formatScore ? window.formatScore(results.score || 0) : (results.score || 0);
+        if (accuracyEl) {
+            const accuracy = Math.round(results.accuracy || 0);
+            accuracyEl.textContent = `${accuracy}%`;
+            
+            // Add grade if available
+            if (window.getAccuracyGrade) {
+                const grade = window.getAccuracyGrade(accuracy);
+                accuracyEl.style.color = grade.color;
+                
+                // Add grade display
+                const gradeEl = accuracyEl.parentElement.querySelector('.grade');
+                if (gradeEl) {
+                    gradeEl.textContent = grade.text;
+                } else {
+                    const newGradeEl = document.createElement('span');
+                    newGradeEl.className = 'grade';
+                    newGradeEl.textContent = grade.text;
+                    accuracyEl.parentElement.appendChild(newGradeEl);
+                }
+            }
+        }
+        
         if (distanceEl) distanceEl.textContent = `${((results.distance || 0) / 1000).toFixed(1)} km`;
-        if (segmentsEl) segmentsEl.textContent = `${results.segments || 0}/${this.currentRoute?.segments.length || 0}`;
+        if (segmentsEl) segmentsEl.textContent = `${results.segmentsCompleted || 0}/${results.totalSegments || this.currentRoute?.segments.length || 0}`;
         if (timeEl) timeEl.textContent = this.formatTime((results.duration || 0) / 1000);
+        
+        // Check for achievements
+        if (window.checkAchievements && window.Storage) {
+            window.Storage.load('personal_bests').then(personalBests => {
+                const category = window.getDistanceCategory ? window.getDistanceCategory(results.distance) : '10km';
+                const achievements = window.checkAchievements(results, personalBests?.[category]);
+                
+                if (achievements.length > 0) {
+                    this.showAchievements(achievements);
+                }
+            });
+        }
+        
+        // Play completion sound
+        if (window.audio) {
+            window.audio.driveComplete();
+        }
     }
 
     async showLeaderboard() {
@@ -448,6 +598,40 @@ class RacingApp {
         if (screenName === 'route' && window.MapManager && !window.mapManager) {
             window.mapManager = new window.MapManager('map-container');
         }
+    }
+
+    showAchievements(achievements) {
+        // Create achievement notification
+        achievements.forEach((achievement, index) => {
+            setTimeout(() => {
+                const notification = document.createElement('div');
+                notification.className = 'achievement-notification';
+                notification.innerHTML = `
+                    <div class="achievement-icon">${achievement.icon}</div>
+                    <div class="achievement-content">
+                        <div class="achievement-title">${achievement.title}</div>
+                        <div class="achievement-description">${achievement.description}</div>
+                    </div>
+                `;
+                
+                document.body.appendChild(notification);
+                
+                // Show animation
+                setTimeout(() => notification.classList.add('show'), 100);
+                
+                // Remove after 4 seconds
+                setTimeout(() => {
+                    notification.classList.remove('show');
+                    setTimeout(() => document.body.removeChild(notification), 300);
+                }, 4000);
+                
+                // Play achievement sound
+                if (window.audio) {
+                    window.audio.achievement();
+                }
+                
+            }, index * 1000); // Stagger multiple achievements
+        });
     }
 
     showLoading(message) {
