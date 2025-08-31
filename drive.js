@@ -67,17 +67,61 @@ class DriveTracker {
         const violation = this.checkSpeedViolation(speedKmh, currentSegment.speedLimit);
         this.handleSpeedViolation(violation);
         
-        // Update UI
-        this.updateDriveUI(speedKmh, accuracy, violation);
+        // Calculate progress within current segment based on GPS position
+        const segmentProgress = this.calculateSegmentProgress(locationData, currentSegment);
         
-        // Check if segment is complete (simplified - using time for now)
-        if (this.shouldAdvanceSegment()) {
+        // Update UI
+        this.updateDriveUI(speedKmh, accuracy, violation, segmentProgress);
+        
+        // Check if segment is complete based on distance/position
+        if (this.shouldAdvanceSegment(locationData, currentSegment)) {
             this.completeCurrentSegment(accuracy);
             this.currentSegment++;
             this.updateSegmentUI();
         }
         
         this.lastPosition = locationData;
+    }
+
+    calculateSegmentProgress(locationData, segment) {
+        // Calculate distance from start of route
+        if (!this.lastPosition) return 0;
+        
+        // Simple distance calculation (Haversine formula)
+        const R = 6371e3; // Earth's radius in meters
+        const φ1 = this.lastPosition.lat * Math.PI / 180;
+        const φ2 = locationData.lat * Math.PI / 180;
+        const Δφ = (locationData.lat - this.lastPosition.lat) * Math.PI / 180;
+        const Δλ = (locationData.lng - this.lastPosition.lng) * Math.PI / 180;
+
+        const a = Math.sin(Δφ/2) * Math.sin(Δφ/2) +
+                Math.cos(φ1) * Math.cos(φ2) *
+                Math.sin(Δλ/2) * Math.sin(Δλ/2);
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+        const distance = R * c;
+
+        this.totalDistance += distance;
+        
+        // Check if we've covered enough distance for this segment
+        const segmentTargetDistance = segment.distance;
+        const currentSegmentDistance = this.totalDistance - this.getDistanceToSegment(this.currentSegment);
+        
+        return Math.min(100, (currentSegmentDistance / segmentTargetDistance) * 100);
+    }
+
+    getDistanceToSegment(segmentIndex) {
+        // Calculate cumulative distance to start of given segment
+        let cumulativeDistance = 0;
+        for (let i = 0; i < segmentIndex; i++) {
+            cumulativeDistance += this.route.segments[i].distance;
+        }
+        return cumulativeDistance;
+    }
+
+    shouldAdvanceSegment(locationData, segment) {
+        // Advance based on actual distance covered vs segment distance
+        const currentSegmentDistance = this.totalDistance - this.getDistanceToSegment(this.currentSegment);
+        return currentSegmentDistance >= segment.distance * 0.9; // 90% of segment distance
     }
 
     calculateSpeedAccuracy(actualSpeed, targetSpeed) {
@@ -108,11 +152,10 @@ class DriveTracker {
         }
     }
 
-    shouldAdvanceSegment() {
-        // Simplified: advance every 10 seconds for demo
-        const segmentDuration = 10000; // 10 seconds per segment
-        const segmentStartTime = this.startTime + (this.currentSegment * segmentDuration);
-        return Date.now() - segmentStartTime > segmentDuration;
+    shouldAdvanceSegment(locationData, segment) {
+        // Advance based on actual distance covered vs segment distance
+        const currentSegmentDistance = this.totalDistance - this.getDistanceToSegment(this.currentSegment);
+        return currentSegmentDistance >= segment.distance * 0.9; // 90% of segment distance
     }
 
     completeCurrentSegment(finalAccuracy) {
@@ -143,15 +186,32 @@ class DriveTracker {
         
         if (instructionEl) instructionEl.textContent = segment.instruction;
         if (speedLimitEl) speedLimitEl.textContent = segment.speedLimit;
-        if (distanceEl) distanceEl.textContent = `${segment.distance}m`;
+        if (distanceEl) distanceEl.textContent = this.formatDistance(segment.distance);
         if (segmentNumEl) segmentNumEl.textContent = this.currentSegment + 1;
         
         // Update completed segments counter
         const completedEl = document.getElementById('segments-completed');
         if (completedEl) completedEl.textContent = this.segmentAccuracies.length;
+        
+        // Update global distance counter
+        const globalDistanceEl = document.getElementById('global-distance');
+        if (globalDistanceEl) {
+            const currentKm = this.getDistanceToSegment(this.currentSegment) / 1000;
+            globalDistanceEl.textContent = `KM ${currentKm.toFixed(1)}`;
+        }
     }
 
-    updateDriveUI(speed, accuracy, violation) {
+    formatDistance(meters) {
+        if (meters >= 1000) {
+            return `${(meters / 1000).toFixed(1)} km`;
+        } else if (meters >= 100) {
+            return `${Math.round(meters / 100) * 100}m`;
+        } else {
+            return `${Math.round(meters)}m`;
+        }
+    }
+
+    updateDriveUI(speed, accuracy, violation, segmentProgress = 0) {
         // Update overall accuracy
         const overallAccuracy = this.segmentAccuracies.length > 0 
             ? this.segmentAccuracies.reduce((a, b) => a + b) / this.segmentAccuracies.length 
@@ -182,10 +242,24 @@ class DriveTracker {
         if (accuracyText) {
             if (violation === 'critical') {
                 accuracyText.textContent = 'TOO FAST!';
+                accuracyText.style.color = '#ff4444';
             } else if (violation === 'warning') {
                 accuracyText.textContent = 'Slow down';
+                accuracyText.style.color = '#ffaa00';
             } else {
                 accuracyText.textContent = `${Math.round(accuracy)}%`;
+                accuracyText.style.color = '#00dd88';
+            }
+        }
+        
+        // Add visual feedback for violations
+        const currentSegmentEl = document.querySelector('.current-segment');
+        if (currentSegmentEl) {
+            currentSegmentEl.classList.remove('warning', 'critical');
+            if (violation === 'warning') {
+                currentSegmentEl.classList.add('warning');
+            } else if (violation === 'critical') {
+                currentSegmentEl.classList.add('critical');
             }
         }
     }

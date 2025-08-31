@@ -25,10 +25,11 @@ class MapManager {
             doubleClickZoom: false
         }).setView([55.7558, 37.6176], 13); // Default to Moscow
 
-        // Add OpenStreetMap tiles
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-            maxZoom: 18
+        // Add CartoDB tiles (neutral, no flags)
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+            attribution: '© <a href="https://carto.com/">CARTO</a>',
+            maxZoom: 18,
+            subdomains: 'abcd'
         }).addTo(this.map);
 
         // Create layers for route and markers

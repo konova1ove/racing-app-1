@@ -1,14 +1,11 @@
-// leaderboard.js - GitHub-based leaderboard system
+// leaderboard.js - Telegram Cloud Storage based leaderboard system
 class LeaderboardManager {
     constructor() {
-        // Updated URL for your repository
-        this.baseUrl = 'https://raw.githubusercontent.com/konova1ove/racing-app-1/main/leaderboard/';
-        this.webhookUrl = 'https://api.github.com/repos/konova1ove/racing-app-1/contents/leaderboard/';
         this.cache = new Map();
-        this.cacheExpiry = 5 * 60 * 1000; // 5 minutes
+        this.cacheExpiry = 2 * 60 * 1000; // 2 minutes
     }
 
-    // Fetch leaderboard data with caching
+    // Fetch leaderboard data from Telegram Cloud Storage
     async getLeaderboard(category = '10km') {
         const cacheKey = `leaderboard_${category}`;
         const cached = this.cache.get(cacheKey);
@@ -19,23 +16,33 @@ class LeaderboardManager {
         }
 
         try {
-            const url = `${this.baseUrl}${category}.json`;
-            const response = await fetch(url);
+            // Try to load from Telegram Cloud Storage
+            let leaderboardData = [];
             
-            if (!response.ok) {
-                console.warn(`Leaderboard ${category} not found, returning demo data`);
-                return this.getDemoLeaderboard();
+            if (window.Storage) {
+                const stored = await window.Storage.load(`leaderboard_${category}`);
+                if (stored && Array.isArray(stored)) {
+                    leaderboardData = stored;
+                }
             }
             
-            const data = await response.json();
+            // If no data, create demo leaderboard for testing
+            if (leaderboardData.length === 0) {
+                leaderboardData = this.getDemoLeaderboard();
+                // Save demo data
+                if (window.Storage) {
+                    await window.Storage.save(`leaderboard_${category}`, leaderboardData);
+                }
+            }
             
             // Cache the result
             this.cache.set(cacheKey, {
-                data: data,
+                data: leaderboardData,
                 timestamp: Date.now()
             });
             
-            return data;
+            console.log(`📊 Loaded ${category} leaderboard:`, leaderboardData.length, 'entries');
+            return leaderboardData;
             
         } catch (error) {
             console.error('Failed to fetch leaderboard:', error);
@@ -106,6 +113,8 @@ class LeaderboardManager {
             const category = this.getDistanceCategory(driveResult.distance);
             const entry = this.formatLeaderboardEntry(driveResult, user);
             
+            console.log(`🏆 Submitting score to ${category}:`, entry);
+            
             // Get current leaderboard
             const currentLeaderboard = await this.getLeaderboard(category);
             
@@ -118,16 +127,24 @@ class LeaderboardManager {
                 if (entry.score > currentLeaderboard[existingEntryIndex].score) {
                     currentLeaderboard[existingEntryIndex] = entry;
                     isPersonalBest = true;
+                    console.log('🏆 New personal best!');
                 }
             } else {
                 // Add new entry
                 currentLeaderboard.push(entry);
                 isPersonalBest = true;
+                console.log('🎆 First entry in category!');
             }
             
             if (isPersonalBest) {
                 // Sort and rank
                 const updatedLeaderboard = this.processLeaderboard(currentLeaderboard);
+                
+                // Save to Telegram Cloud Storage
+                if (window.Storage) {
+                    await window.Storage.save(`leaderboard_${category}`, updatedLeaderboard);
+                    console.log(`💾 Leaderboard saved to Telegram Cloud Storage`);
+                }
                 
                 // Update cache immediately
                 this.cache.set(`leaderboard_${category}`, {
@@ -135,17 +152,21 @@ class LeaderboardManager {
                     timestamp: Date.now()
                 });
                 
-                // Send achievement notification
+                // Find user's rank
                 const userRank = updatedLeaderboard.find(e => e.userId === user.id)?.rank || 0;
+                
+                // Send achievement notification
                 this.sendAchievementNotification(user, entry, userRank);
                 
                 return { success: true, rank: userRank, isPersonalBest: true };
+            } else {
+                console.log('😐 Score not better than existing personal best');
             }
             
             return { success: true, isPersonalBest: false };
             
         } catch (error) {
-            console.error('Score submission failed:', error);
+            console.error('❌ Score submission failed:', error);
             return { success: false, error: error.message };
         }
     }
