@@ -2,8 +2,8 @@
 class LeaderboardManager {
     constructor() {
         // Updated URL for your repository
-        this.baseUrl = 'https://raw.githubusercontent.com/konova1ove/racing-app-1/main/leaderboards/';
-        this.webhookUrl = 'https://api.github.com/repos/konova1ove/racing-app-1/contents/leaderboards/';
+        this.baseUrl = 'https://raw.githubusercontent.com/konova1ove/racing-app-1/main/leaderboard/';
+        this.webhookUrl = 'https://api.github.com/repos/konova1ove/racing-app-1/contents/leaderboard/';
         this.cache = new Map();
         this.cacheExpiry = 5 * 60 * 1000; // 5 minutes
     }
