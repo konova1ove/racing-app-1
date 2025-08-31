@@ -1,1 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Racing Navigation</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="style.css">
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+</head>
+<body>
+    <div id="app">
+        <!-- Loading Screen -->
+        <div id="loading-screen" class="screen active">
+            <div class="loading-content">
+                <div class="loading-spinner"></div>
+                <h2>🏁 Racing Navigation</h2>
+                <p>Initializing...</p>
+            </div>
+        </div>
 
+        <!-- Main Screen -->
+        <div id="main-screen" class="screen">
+            <header class="app-header">
+                <h1>🏁 Racing Nav</h1>
+                <div class="user-info">
+                    <span id="username">Loading...</span>
+                </div>
+            </header>
+
+            <div class="main-content">
+                <div class="search-section">
+                    <input type="text" id="destination-input" placeholder="Where do you want to race?" class="destination-input">
+                    <button id="search-btn" class="btn btn-primary">Search Route</button>
+                </div>
+
+                <div class="quick-actions">
+                    <button id="leaderboard-btn" class="btn btn-secondary">🏆 Leaderboard</button>
+                    <button id="history-btn" class="btn btn-secondary">📊 History</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="storage.js"></script>
+    <script src="scoring.js"></script>
+    <script src="audio.js"></script>
+    <script src="app.js"></script>
+
+    <script>
+        // Simple test to verify app loads
+        document.addEventListener('DOMContentLoaded', () => {
+            console.log('Racing Navigation App Loaded!');
+            
+            // Initialize basic functionality
+            if (window.Telegram?.WebApp) {
+                window.Telegram.WebApp.ready();
+                window.Telegram.WebApp.expand();
+                
+                const user = window.Telegram.WebApp.initDataUnsafe?.user;
+                if (user) {
+                    document.getElementById('username').textContent = user.first_name;
+                }
+            }
+            
+            // Show main screen after loading
+            setTimeout(() => {
+                document.getElementById('loading-screen').classList.remove('active');
+                document.getElementById('main-screen').classList.add('active');
+            }, 2000);
+        });
+    </script>
+</body>
+</html>
