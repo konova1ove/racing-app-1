@@ -37,7 +37,144 @@
                 <div class="quick-actions">
                     <button id="leaderboard-btn" class="btn btn-secondary">🏆 Leaderboard</button>
                     <button id="history-btn" class="btn btn-secondary">📊 History</button>
+                    <button id="settings-btn" class="btn btn-secondary">⚙️ Settings</button>
                 </div>
+            </div>
+        </div>
+
+        <!-- Route Preview Screen -->
+        <div id="route-screen" class="screen">
+            <header class="app-header">
+                <button id="back-to-main" class="btn btn-back">← Back</button>
+                <h1>Route Preview</h1>
+            </header>
+            
+            <div id="map-container"></div>
+            
+            <div class="route-info">
+                <div class="route-stats">
+                    <div class="stat">
+                        <span class="label">Distance:</span>
+                        <span id="route-distance">-</span>
+                    </div>
+                    <div class="stat">
+                        <span class="label">Segments:</span>
+                        <span id="route-segments">-</span>
+                    </div>
+                    <div class="stat">
+                        <span class="label">Est. Time:</span>
+                        <span id="route-time">-</span>
+                    </div>
+                </div>
+                <button id="start-drive-btn" class="btn btn-primary btn-large">🏁 Start Racing</button>
+            </div>
+        </div>
+
+        <!-- Drive Screen -->
+        <div id="drive-screen" class="screen">
+            <div class="drive-header">
+                <button id="stop-drive-btn" class="btn btn-danger btn-small">Stop</button>
+                <div class="drive-timer">
+                    <span id="drive-time">00:00</span>
+                </div>
+                <div class="current-speed">
+                    <span id="current-speed">0</span> km/h
+                </div>
+            </div>
+
+            <div class="drive-stats">
+                <div class="stat-box">
+                    <div class="stat-value" id="overall-accuracy">0%</div>
+                    <div class="stat-label">Accuracy</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-value" id="current-segment-num">1</div>
+                    <div class="stat-label">Segment</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-value" id="segments-completed">0</div>
+                    <div class="stat-label">Complete</div>
+                </div>
+            </div>
+
+            <div class="current-segment">
+                <div class="segment-info">
+                    <div class="segment-instruction" id="current-instruction">Get ready to start</div>
+                    <div class="segment-details">
+                        <span class="speed-limit" id="current-speed-limit">60</span> km/h
+                        <span class="segment-distance" id="current-distance">0m</span>
+                    </div>
+                </div>
+                <div class="segment-accuracy">
+                    <div class="accuracy-bar">
+                        <div class="accuracy-fill" id="segment-accuracy-fill"></div>
+                    </div>
+                    <span class="accuracy-text" id="segment-accuracy-text">Ready</span>
+                </div>
+            </div>
+
+            <div class="upcoming-segments" id="upcoming-segments">
+                <!-- Dynamically filled -->
+            </div>
+        </div>
+
+        <!-- Results Screen -->
+        <div id="results-screen" class="screen">
+            <header class="app-header">
+                <h1>🏁 Race Results</h1>
+            </header>
+
+            <div class="results-content">
+                <div class="final-score">
+                    <div class="score-circle">
+                        <span id="final-score">0</span>
+                        <small>points</small>
+                    </div>
+                </div>
+
+                <div class="results-stats">
+                    <div class="result-stat">
+                        <span class="label">Overall Accuracy:</span>
+                        <span id="final-accuracy">0%</span>
+                    </div>
+                    <div class="result-stat">
+                        <span class="label">Distance:</span>
+                        <span id="final-distance">0 km</span>
+                    </div>
+                    <div class="result-stat">
+                        <span class="label">Segments Completed:</span>
+                        <span id="final-segments">0/0</span>
+                    </div>
+                    <div class="result-stat">
+                        <span class="label">Drive Time:</span>
+                        <span id="final-time">00:00</span>
+                    </div>
+                </div>
+
+                <div class="results-actions">
+                    <button id="share-results-btn" class="btn btn-primary">📤 Share Results</button>
+                    <button id="view-leaderboard-btn" class="btn btn-secondary">🏆 View Leaderboard</button>
+                    <button id="race-again-btn" class="btn btn-secondary">🔄 Race Again</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Leaderboard Screen -->
+        <div id="leaderboard-screen" class="screen">
+            <header class="app-header">
+                <button id="back-from-leaderboard" class="btn btn-back">← Back</button>
+                <h1>🏆 Leaderboard</h1>
+            </header>
+
+            <div class="leaderboard-tabs">
+                <button class="tab-btn active" data-category="10km">10km</button>
+                <button class="tab-btn" data-category="50km">50km</button>
+                <button class="tab-btn" data-category="100km">100km</button>
+                <button class="tab-btn" data-category="1000km">1000km</button>
+            </div>
+
+            <div class="leaderboard-list" id="leaderboard-list">
+                <div class="loading">Loading rankings...</div>
             </div>
         </div>
     </div>
@@ -47,30 +184,9 @@
     <script src="storage.js"></script>
     <script src="scoring.js"></script>
     <script src="audio.js"></script>
+    <script src="map.js"></script>
+    <script src="drive.js"></script>
+    <script src="leaderboard.js"></script>
     <script src="app.js"></script>
-
-    <script>
-        // Simple test to verify app loads
-        document.addEventListener('DOMContentLoaded', () => {
-            console.log('Racing Navigation App Loaded!');
-            
-            // Initialize basic functionality
-            if (window.Telegram?.WebApp) {
-                window.Telegram.WebApp.ready();
-                window.Telegram.WebApp.expand();
-                
-                const user = window.Telegram.WebApp.initDataUnsafe?.user;
-                if (user) {
-                    document.getElementById('username').textContent = user.first_name;
-                }
-            }
-            
-            // Show main screen after loading
-            setTimeout(() => {
-                document.getElementById('loading-screen').classList.remove('active');
-                document.getElementById('main-screen').classList.add('active');
-            }, 2000);
-        });
-    </script>
 </body>
 </html>
