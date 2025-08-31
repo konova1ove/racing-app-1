@@ -148,270 +148,45 @@ class DataStorage {
 
 ## Routing & Navigation
 
-## Action Flow
+### Simple Route Planning
 
-### Complete User Journey
-
-#### 1. App Initialization Flow
-
-```mermaid
-flowchart TD
-    A[User Opens Telegram Mini App] --> B[Load App in WebView]
-    B --> C[Initialize Telegram SDK]
-    C --> D[Get User Info]
-    D --> E[Load Saved Settings]
-    E --> F[Initialize Map]
-    F --> G[Request Location Permission]
-    G --> H{Permission Granted?}
-    H -->|Yes| I[Show Main Screen]
-    H -->|No| J[Show Permission Request]
-    J --> G
-    I --> K[Ready to Navigate]
-```
-
-#### 2. Route Planning Flow
-
-```mermaid
-flowchart TD
-    A[Main Screen] --> B[User Taps Destination Search]
-    B --> C[Show Search Input]
-    C --> D[User Types Address]
-    D --> E[Call Nominatim Geocoding]
-    E --> F[Show Search Results]
-    F --> G[User Selects Destination]
-    G --> H[Call OSRM Routing API]
-    H --> I[Process Route Data]
-    I --> J[Split into Segments]
-    J --> K[Apply Speed Limits]
-    K --> L[Show Route Preview]
-    L --> M{User Confirms Route?}
-    M -->|Yes| N[Save Route to Storage]
-    M -->|No| A
-    N --> O[Show Start Drive Button]
-```
-
-#### 3. Drive Tracking Flow
-
-```mermaid
-flowchart TD
-    A[User Starts Drive] --> B[Initialize GPS Tracking]
-    B --> C[Show Drive Interface]
-    C --> D[Start Location Updates]
-    D --> E[Process GPS Position]
-    E --> F[Calculate Current Speed]
-    F --> G[Determine Current Segment]
-    G --> H[Check Speed Accuracy]
-    H --> I{Speed Violation?}
-    I -->|None| J[Update Accuracy Score]
-    I -->|Warning| K[Play Warning Sound + Haptic]
-    I -->|Critical| L[Play Error Sound + Haptic]
-    K --> J
-    L --> M[Mark Segment as Failed]
-    M --> J
-    J --> N{Segment Complete?}
-    N -->|No| D
-    N -->|Yes| O[Play Completion Sound]
-    O --> P[Move to Next Segment]
-    P --> Q{Route Complete?}
-    Q -->|No| D
-    Q -->|Yes| R[Calculate Final Score]
-```
-
-#### 4. Score Calculation & Results Flow
-
-```mermaid
-flowchart TD
-    A[Drive Complete] --> B[Calculate Segment Accuracies]
-    B --> C[Calculate Average Accuracy]
-    C --> D[Apply Distance Multiplier]
-    D --> E[Calculate Final Score]
-    E --> F[Determine Distance Category]
-    F --> G[Check Personal Best]
-    G --> H{New Personal Best?}
-    H -->|Yes| I[Save New Personal Best]
-    H -->|No| J[Save Regular Result]
-    I --> K[Trigger Achievement Notification]
-    J --> L[Show Results Screen]
-    K --> L
-    L --> M[Update Leaderboard]
-    M --> N[Send Telegram Bot Notification]
-```
-
-#### 5. Leaderboard Integration Flow
-
-```mermaid
-flowchart TD
-    A[New Score Available] --> B[Determine Category]
-    B --> C[Fetch Current Leaderboard]
-    C --> D[Insert New Score]
-    D --> E[Sort by Score]
-    E --> F[Keep Top 100]
-    F --> G[Update GitHub JSON]
-    G --> H[Send to Webhook]
-    H --> I[GitHub Updates File]
-    I --> J[Notify Other Users]
-    J --> K[Update User Rankings]
-```
-
-### Key User Interactions
-
-#### Main Screen Actions
 ```javascript
-// User interaction handlers
-const userActions = {
-  // Search for destination
-  searchDestination: () => {
-    showSearchInput();
-    focusSearchField();
-  },
+// Simple route calculation
+async function calculateRoute(startLat, startLng, endLat, endLng) {
+  const url = `https://router.project-osrm.org/route/v1/driving/${startLng},${startLat};${endLng},${endLat}?steps=true`;
   
-  // View leaderboards
-  viewLeaderboards: () => {
-    loadLeaderboardData();
-    showLeaderboardScreen();
-  },
-  
-  // View drive history
-  viewHistory: () => {
-    loadDriveHistory();
-    showHistoryScreen();
-  },
-  
-  // Access settings
-  openSettings: () => {
-    loadUserSettings();
-    showSettingsScreen();
+  try {
+    const response = await fetch(url);
+    const data = await response.json();
+    return processRoute(data.routes[0]);
+  } catch (error) {
+    console.error('Route calculation failed:', error);
+    return null;
   }
-};
-```
+}
 
-#### Drive Screen Actions
-```javascript
-// Drive-specific interactions
-const driveActions = {
-  // Start drive tracking
-  startDrive: (route) => {
-    initializeGPS();
-    startLocationTracking();
-    showDriveInterface();
-    audio.segmentStart();
-  },
+// Convert OSRM response to simple segments
+function processRoute(osrmRoute) {
+  const segments = osrmRoute.legs[0].steps.map((step, index) => ({
+    id: index,
+    distance: Math.round(step.distance),
+    duration: Math.round(step.duration),
+    instruction: step.maneuver.instruction || `Continue ${Math.round(step.distance)}m`,
+    speedLimit: getDefaultSpeedLimit(step.distance), // Simple default logic
+    coordinates: step.geometry
+  }));
   
-  // Pause drive (if needed)
-  pauseDrive: () => {
-    pauseLocationTracking();
-    saveCurrentProgress();
-    showPauseInterface();
-  },
-  
-  // Stop drive early
-  stopDrive: () => {
-    confirmStopDrive();
-    calculatePartialResults();
-    showResults();
-  },
-  
-  // Handle GPS updates
-  onLocationUpdate: (position) => {
-    updateCurrentPosition(position);
-    calculateSpeed(position);
-    updateSegmentProgress();
-    checkSpeedViolation();
-    updateUI();
-  }
-};
-```
+  return {
+    segments,
+    totalDistance: Math.round(osrmRoute.distance),
+    totalDuration: Math.round(osrmRoute.duration)
+  };
+}
 
-### System State Transitions
-
-#### App States
-```javascript
-const AppStates = {
-  LOADING: 'loading',           // Initial app load
-  READY: 'ready',               // Main screen, ready for input
-  PLANNING: 'planning',         // Route calculation in progress
-  PREVIEW: 'preview',           // Route preview, waiting for confirmation
-  DRIVING: 'driving',           // Active drive tracking
-  PAUSED: 'paused',            // Drive temporarily paused
-  RESULTS: 'results',           // Showing drive results
-  LEADERBOARD: 'leaderboard',   // Viewing leaderboards
-  SETTINGS: 'settings'          // User settings screen
-};
-
-// State transition rules
-const allowedTransitions = {
-  [AppStates.LOADING]: [AppStates.READY],
-  [AppStates.READY]: [AppStates.PLANNING, AppStates.LEADERBOARD, AppStates.SETTINGS],
-  [AppStates.PLANNING]: [AppStates.PREVIEW, AppStates.READY],
-  [AppStates.PREVIEW]: [AppStates.DRIVING, AppStates.READY],
-  [AppStates.DRIVING]: [AppStates.PAUSED, AppStates.RESULTS],
-  [AppStates.PAUSED]: [AppStates.DRIVING, AppStates.RESULTS],
-  [AppStates.RESULTS]: [AppStates.READY, AppStates.LEADERBOARD],
-  [AppStates.LEADERBOARD]: [AppStates.READY],
-  [AppStates.SETTINGS]: [AppStates.READY]
-};
-```
-
-### Error Handling Flow
-
-#### GPS/Location Errors
-```mermaid
-flowchart TD
-    A[GPS Error Detected] --> B{Error Type}
-    B -->|Permission Denied| C[Show Permission Request]
-    B -->|Signal Lost| D[Show GPS Lost Warning]
-    B -->|Accuracy Too Low| E[Show Accuracy Warning]
-    C --> F[Request Permission Again]
-    D --> G[Continue with Last Known Position]
-    E --> G
-    F --> H{Permission Granted?}
-    H -->|Yes| I[Resume Normal Operation]
-    H -->|No| J[Show Error Message]
-    G --> I
-    J --> K[Disable Drive Features]
-```
-
-#### Network/API Errors
-```mermaid
-flowchart TD
-    A[API Call Fails] --> B{Error Type}
-    B -->|Network Offline| C[Show Offline Message]
-    B -->|Route Not Found| D[Show Route Error]
-    B -->|Server Error| E[Show Retry Option]
-    C --> F[Cache Data Locally]
-    D --> G[Suggest Alternative]
-    E --> H[Retry Request]
-    F --> I[Use Cached Data]
-    G --> J[Show Search Again]
-    H --> K{Retry Successful?}
-    K -->|Yes| L[Continue Normal Flow]
-    K -->|No| M[Show Fallback Options]
-```
-
-### Performance Optimization Flow
-
-#### GPS Data Processing
-```javascript
-// Optimize GPS updates for performance
-const gpsOptimization = {
-  updateFrequency: 1000, // 1 second intervals
-  
-  processGPSUpdate: (position) => {
-    // Throttle updates to prevent UI lag
-    if (Date.now() - lastUpdate < 500) return;
-    
-    // Smooth GPS noise
-    const smoothedPosition = smoothGPSNoise(position);
-    
-    // Update only if significant change
-    if (distanceFromLast(smoothedPosition) > 5) {
-      updateDriveState(smoothedPosition);
-      updateUI();
-    }
-    
-    lastUpdate = Date.now();
-  }
-};
+// Simple speed limit logic
+function getDefaultSpeedLimit(distance) {
+  return distance > 1000 ? 90 : 60; // Highway vs city simple rule
+}
 ```
 
 ## State Management
