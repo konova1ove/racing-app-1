@@ -1,135 +1,271 @@
 import React, { useState, useCallback } from 'react';
-import ZoneSelector from './components/ZoneSelector';
-import VideoProcessor from './components/VideoProcessor';
-import ResultsDisplay from './components/ResultsDisplay';
-import { Zone, AssessmentResult, AppState } from './types';
-import { getAllZones } from './constants/zones';
+import type { Zone, AssessmentResult, ProcessingStage } from './types';
+import { ZONES, COMING_SOON_ZONES } from './constants/zones';
 import { STORAGE_KEYS } from './constants';
+import ZoneSelector from './components/ZoneSelector/ZoneSelector';
+import VideoProcessor from './components/VideoProcessor/VideoProcessor';
+import ResultsDisplay from './components/ResultsDisplay/ResultsDisplay';
+import ErrorBoundary from './components/ErrorBoundary/ErrorBoundary';
+import LoadingOverlay from './components/LoadingOverlay/LoadingOverlay';
+import './App.css';
+
+type AppScreen = 'zone-selection' | 'video-processing' | 'results';
 
 function App() {
-  const [appState, setAppState] = useState<AppState>(() => {
-    // Load completed zones from localStorage
-    const savedCompletedZones = localStorage.getItem(STORAGE_KEYS.completedZones);
-    return {
-      currentZone: null,
-      assessmentResults: [],
-      isProcessing: false,
-      completedZones: savedCompletedZones ? JSON.parse(savedCompletedZones) : [],
-      processingStage: 'idle',
-      error: null
-    };
-  });
-
+  // Main application state
+  const [currentScreen, setCurrentScreen] = useState<AppScreen>('zone-selection');
+  const [currentZone, setCurrentZone] = useState<Zone | null>(null);
+  const [assessmentResults, setAssessmentResults] = useState<AssessmentResult[]>([]);
+  const [completedZones, setCompletedZones] = useState<string[]>([]);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [processingStage, setProcessingStage] = useState<ProcessingStage>('idle');
+  const [error, setError] = useState<string | null>(null);
   const [currentResult, setCurrentResult] = useState<AssessmentResult | null>(null);
-  const [currentView, setCurrentView] = useState<'zones' | 'video' | 'results'>('zones');
 
-  // Save completed zones to localStorage
-  const saveCompletedZones = useCallback((zones: string[]) => {
-    localStorage.setItem(STORAGE_KEYS.completedZones, JSON.stringify(zones));
+  // Load saved data on component mount
+  React.useEffect(() => {
+    loadSavedData();
   }, []);
+
+  // Save data to localStorage
+  const saveData = useCallback(() => {
+    try {
+      localStorage.setItem(STORAGE_KEYS.assessmentResults, JSON.stringify(assessmentResults));
+      localStorage.setItem(STORAGE_KEYS.completedZones, JSON.stringify(completedZones));
+    } catch (error) {
+      console.warn('Failed to save data to localStorage:', error);
+    }
+  }, [assessmentResults, completedZones]);
+
+  // Load saved data from localStorage
+  const loadSavedData = useCallback(() => {
+    try {
+      const savedResults = localStorage.getItem(STORAGE_KEYS.assessmentResults);
+      const savedCompletedZones = localStorage.getItem(STORAGE_KEYS.completedZones);
+
+      if (savedResults) {
+        const results = JSON.parse(savedResults);
+        setAssessmentResults(results);
+      }
+
+      if (savedCompletedZones) {
+        const completed = JSON.parse(savedCompletedZones);
+        setCompletedZones(completed);
+      }
+    } catch (error) {
+      console.warn('Failed to load saved data:', error);
+    }
+  }, []);
+
+  // Save data whenever it changes
+  React.useEffect(() => {
+    saveData();
+  }, [saveData]);
 
   // Handle zone selection
   const handleZoneSelect = useCallback((zone: Zone) => {
-    setAppState(prev => ({ ...prev, currentZone: zone }));
-    setCurrentView('video');
-  }, []);
-
-  // Handle going back to zone selection
-  const handleBackToZones = useCallback(() => {
-    setAppState(prev => ({ ...prev, currentZone: null }));
-    setCurrentView('zones');
+    setCurrentZone(zone);
+    setCurrentScreen('video-processing');
+    setError(null);
   }, []);
 
   // Handle processing completion
   const handleProcessingComplete = useCallback((result: AssessmentResult) => {
     setCurrentResult(result);
-    setCurrentView('results');
+    setAssessmentResults(prev => {
+      // Remove any existing result for this zone and add the new one
+      const filtered = prev.filter(r => r.zoneId !== result.zoneId);
+      return [...filtered, result];
+    });
     
-    // Add zone to completed zones if not already there
-    const newCompletedZones = [...appState.completedZones];
-    if (!newCompletedZones.includes(result.zoneId)) {
-      newCompletedZones.push(result.zoneId);
-      setAppState(prev => ({ ...prev, completedZones: newCompletedZones }));
-      saveCompletedZones(newCompletedZones);
-    }
+    setCompletedZones(prev => {
+      if (!prev.includes(result.zoneId)) {
+        return [...prev, result.zoneId];
+      }
+      return prev;
+    });
     
-    // Add result to assessment results
-    setAppState(prev => ({
-      ...prev,
-      assessmentResults: [...prev.assessmentResults, result]
-    }));
-  }, [appState.completedZones, saveCompletedZones]);
-
-  // Handle PDF download
-  const handleDownloadPDF = useCallback(async () => {
-    if (!currentResult) return;
-    
-    try {
-      const { getPDFGenerator } = await import('./services/pdfGenerator');
-      const pdfGenerator = getPDFGenerator();
-      
-      await pdfGenerator.generateAndDownload(currentResult, {
-        language: 'ru',
-        includeObjectDetails: true,
-        addWatermark: true
-      });
-    } catch (error) {
-      console.error('PDF generation failed:', error);
-      alert('Ошибка при создании PDF. Попробуйте еще раз.');
-    }
-  }, [currentResult]);
-
-  // Handle assess another zone
-  const handleAssessAnother = useCallback(() => {
-    setCurrentResult(null);
-    setCurrentView('zones');
-    setAppState(prev => ({ ...prev, currentZone: null }));
+    setCurrentScreen('results');
+    setIsProcessing(false);
+    setProcessingStage('complete');
   }, []);
 
-  const zones = getAllZones();
+  // Handle back to zone selection
+  const handleBackToZones = useCallback(() => {
+    setCurrentScreen('zone-selection');
+    setCurrentZone(null);
+    setCurrentResult(null);
+    setError(null);
+    setProcessingStage('idle');
+  }, []);
 
-  return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="container mx-auto px-4 py-8">
-        {currentView === 'zones' && (
+  // Handle processing start
+  const handleProcessingStart = useCallback(() => {
+    setIsProcessing(true);
+    setError(null);
+  }, []);
+
+  // Handle processing stage updates
+  const handleProcessingStageUpdate = useCallback((stage: ProcessingStage) => {
+    setProcessingStage(stage);
+  }, []);
+
+  // Handle errors
+  const handleError = useCallback((errorMessage: string) => {
+    setError(errorMessage);
+    setIsProcessing(false);
+    setProcessingStage('error');
+  }, []);
+
+  // Get all zones for selector
+  const allZones = [...ZONES, ...COMING_SOON_ZONES];
+
+  // Render current screen
+  const renderCurrentScreen = () => {
+    switch (currentScreen) {
+      case 'zone-selection':
+        return (
           <ZoneSelector
-            zones={zones}
+            zones={allZones}
             onZoneSelect={handleZoneSelect}
-            completedZones={appState.completedZones}
+            completedZones={completedZones}
+            className="max-w-6xl mx-auto"
           />
-        )}
-        
-        {currentView === 'video' && appState.currentZone && (
-          <div className="space-y-6">
-            <VideoProcessor
-              zone={appState.currentZone}
-              onProcessingComplete={handleProcessingComplete}
-              onBack={handleBackToZones}
-            />
-          </div>
-        )}
-        
-        {currentView === 'results' && currentResult && (
+        );
+      
+      case 'video-processing':
+        return currentZone ? (
+          <VideoProcessor
+            zone={currentZone}
+            onProcessingComplete={handleProcessingComplete}
+            onProcessingStart={handleProcessingStart}
+            onProcessingStageUpdate={handleProcessingStageUpdate}
+            onBack={handleBackToZones}
+            onError={handleError}
+            className="max-w-4xl mx-auto"
+          />
+        ) : null;
+      
+      case 'results':
+        return currentResult ? (
           <ResultsDisplay
             result={currentResult}
-            onDownloadPDF={handleDownloadPDF}
-            onAssessAnother={handleAssessAnother}
+            onAssessAnother={handleBackToZones}
+            className="max-w-4xl mx-auto"
+          />
+        ) : null;
+      
+      default:
+        return null;
+    }
+  };
+
+  return (
+    <ErrorBoundary>
+      <div className="min-h-screen bg-gray-50">
+        {/* Header */}
+        <header className="bg-white shadow-sm border-b border-gray-200">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center">
+                <div className="text-2xl mr-3">🏨</div>
+                <div>
+                  <h1 className="text-xl font-bold text-gray-900">
+                    Secret Guest MVP
+                  </h1>
+                  <p className="text-sm text-gray-500">
+                    Автоматизированная оценка качества отелей
+                  </p>
+                </div>
+              </div>
+              
+              {/* Navigation breadcrumbs */}
+              <nav className="hidden md:flex items-center space-x-2 text-sm">
+                <button
+                  onClick={handleBackToZones}
+                  className={`px-3 py-1 rounded-md transition-colors ${
+                    currentScreen === 'zone-selection'
+                      ? 'bg-blue-100 text-blue-700'
+                      : 'text-gray-500 hover:text-gray-700'
+                  }`}
+                >
+                  Выбор зоны
+                </button>
+                {currentZone && (
+                  <>
+                    <span className="text-gray-400">/</span>
+                    <span className={`px-3 py-1 rounded-md ${
+                      currentScreen === 'video-processing' 
+                        ? 'bg-blue-100 text-blue-700'
+                        : 'text-gray-500'
+                    }`}>
+                      {currentZone.name}
+                    </span>
+                  </>
+                )}
+                {currentScreen === 'results' && (
+                  <>
+                    <span className="text-gray-400">/</span>
+                    <span className="px-3 py-1 rounded-md bg-green-100 text-green-700">
+                      Результаты
+                    </span>
+                  </>
+                )}
+              </nav>
+            </div>
+          </div>
+        </header>
+
+        {/* Main content */}
+        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          {error && (
+            <div className="mb-6 bg-red-50 border border-red-200 rounded-lg p-4">
+              <div className="flex items-center">
+                <div className="text-red-600 mr-3">⚠️</div>
+                <div>
+                  <h3 className="text-sm font-medium text-red-800">
+                    Произошла ошибка
+                  </h3>
+                  <p className="text-sm text-red-700 mt-1">
+                    {error}
+                  </p>
+                </div>
+                <button
+                  onClick={() => setError(null)}
+                  className="ml-auto text-red-400 hover:text-red-600"
+                >
+                  ✕
+                </button>
+              </div>
+            </div>
+          )}
+
+          {renderCurrentScreen()}
+        </main>
+
+        {/* Loading overlay */}
+        {isProcessing && (
+          <LoadingOverlay
+            stage={processingStage}
+            isVisible={isProcessing}
           />
         )}
+
+        {/* Footer */}
+        <footer className="bg-white border-t border-gray-200 mt-16">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+            <div className="text-center text-sm text-gray-500">
+              <p>
+                Secret Guest MVP - демонстрация автоматизированной оценки качества отелей
+              </p>
+              <p className="mt-1">
+                Используется компьютерное зрение для анализа видео и генерации отчетов
+              </p>
+            </div>
+          </div>
+        </footer>
       </div>
-      
-      {/* Footer */}
-      <footer className="bg-white border-t border-gray-200 py-8 mt-16">
-        <div className="container mx-auto px-4 text-center text-gray-600">
-          <p className="mb-2">
-            Секретный Гость MVP - Автоматизированная оценка качества отеля
-          </p>
-          <p className="text-sm">
-            Версия 1.0.0 • Создано для хакатона
-          </p>
-        </div>
-      </footer>
-    </div>
+    </ErrorBoundary>
   );
 }
 

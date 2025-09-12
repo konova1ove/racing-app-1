@@ -1,4 +1,4 @@
-import { ObjectClasses, RoboflowConfig } from '../types';
+import type { ObjectClasses, RoboflowConfig } from '../types';
 
 // Object classes for computer vision detection
 export const OBJECT_CLASSES: ObjectClasses = {

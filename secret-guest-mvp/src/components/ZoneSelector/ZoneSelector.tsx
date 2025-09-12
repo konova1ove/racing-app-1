@@ -1,6 +1,6 @@
 import React from 'react';
 import { CheckCircle, Clock, ArrowRight } from 'lucide-react';
-import { Zone, ZoneSelectorProps } from '../../types';
+import type { Zone, ZoneSelectorProps } from '../../types';
 
 const ZoneSelector: React.FC<ZoneSelectorProps> = ({
   zones,

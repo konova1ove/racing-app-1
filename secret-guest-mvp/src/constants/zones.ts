@@ -1,4 +1,4 @@
-import { Zone, Question, ScoringCriteria, DetectionRule, ScoreThreshold } from '../types';
+import type { Zone, Question, ScoringCriteria, DetectionRule, ScoreThreshold } from '../types';
 
 // Reception Zone Questions and Scoring
 const receptionQuestions: Question[] = [
