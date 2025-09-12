@@ -5,7 +5,6 @@ import { ROBOFLOW_CONFIG, API_ENDPOINTS, ERROR_MESSAGES } from '../../constants'
 
 interface VisionAnalyzerProps {
   frames: FrameData[];
-  zone: Zone;
   onAnalysisComplete: (detectedObjects: DetectedObject[]) => void;
   onProgress: (progress: number) => void;
   onError: (error: string) => void;
@@ -13,7 +12,6 @@ interface VisionAnalyzerProps {
 
 const VisionAnalyzer: React.FC<VisionAnalyzerProps> = ({
   frames,
-  zone,
   onAnalysisComplete,
   onProgress,
   onError

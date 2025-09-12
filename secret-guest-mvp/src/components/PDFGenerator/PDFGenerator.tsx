@@ -31,7 +31,7 @@ const PDFGenerator: React.FC<PDFGeneratorProps> = ({
       let currentY = margin;
 
       // Helper function to add text with automatic line breaks
-      const addText = (text: string, fontSize: number, isBold: boolean = false, color: string = PDF_CONFIG.colors.text) => {
+      const addText = (text: string, fontSize: number, isBold: boolean = false) => {
         pdf.setFontSize(fontSize);
         pdf.setFont('helvetica', isBold ? 'bold' : 'normal');
         
@@ -56,8 +56,8 @@ const PDFGenerator: React.FC<PDFGeneratorProps> = ({
       };
 
       // Title
-      addText(PDF_CONFIG.title, PDF_CONFIG.fontSize.title, true, PDF_CONFIG.colors.primary);
-      addText(PDF_CONFIG.subtitle, PDF_CONFIG.fontSize.subtitle, false, PDF_CONFIG.colors.secondary);
+      addText(PDF_CONFIG.title, PDF_CONFIG.fontSize.title, true);
+      addText(PDF_CONFIG.subtitle, PDF_CONFIG.fontSize.subtitle, false);
       
       // Assessment info
       currentY += 5;
@@ -118,8 +118,8 @@ const PDFGenerator: React.FC<PDFGeneratorProps> = ({
       addSeparator();
 
       // Footer
-      addText('Отчет создан автоматически с помощью системы Secret Guest MVP', PDF_CONFIG.fontSize.small, false, PDF_CONFIG.colors.secondary);
-      addText('Использовано компьютерное зрение для анализа видео', PDF_CONFIG.fontSize.small, false, PDF_CONFIG.colors.secondary);
+      addText('Отчет создан автоматически с помощью системы Secret Guest MVP', PDF_CONFIG.fontSize.small, false);
+      addText('Использовано компьютерное зрение для анализа видео', PDF_CONFIG.fontSize.small, false);
 
       // Save the PDF
       const fileName = `secret-guest-${result.zoneName}-${result.completedAt.getTime()}.pdf`;

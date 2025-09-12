@@ -100,7 +100,7 @@ const ScoringEngine: React.FC<ScoringEngineProps> = ({
       );
 
       if (!hasPositiveFactors) {
-        score = Math.max(1, SCORING_CONFIG.maxStars - 2);
+        score = Math.max(1, SCORING_CONFIG.maxStars - 2) as 5;
         reasoning = 'Не обнаружены ожидаемые объекты для оценки';
       } else {
         reasoning = 'Базовая оценка на основе общих факторов';
@@ -146,7 +146,7 @@ const ScoringEngine: React.FC<ScoringEngineProps> = ({
       }
 
       // Apply modifiers
-      score = Math.max(1, Math.min(SCORING_CONFIG.maxStars, score + scoreModifier));
+      score = Math.max(1, Math.min(SCORING_CONFIG.maxStars, score + scoreModifier)) as 5;
 
       // Generate reasoning
       if (detectedIssues.length > 0 && detectedPositives.length > 0) {
@@ -159,7 +159,7 @@ const ScoringEngine: React.FC<ScoringEngineProps> = ({
     }
 
     return {
-      stars: Math.round(score),
+      stars: Math.round(score) as 5,
       confidence: Math.round(confidence * 100) / 100,
       relatedObjects,
       reasoning: reasoning || 'Автоматическая оценка на основе анализа изображений'
@@ -180,7 +180,7 @@ const ScoringEngine: React.FC<ScoringEngineProps> = ({
   }, []);
 
   // Generate answer text based on score
-  const generateAnswerText = useCallback((question: any, objects: DetectedObject[], scoreData: any): string => {
+  const generateAnswerText = useCallback((_question: any, _objects: DetectedObject[], scoreData: any): string => {
     const stars = scoreData.stars;
     
     if (stars >= 5) {
@@ -197,7 +197,7 @@ const ScoringEngine: React.FC<ScoringEngineProps> = ({
   }, []);
 
   // Generate aggregated comment
-  const generateAggregatedComment = useCallback((zone: Zone, objects: DetectedObject[], answers: QuestionAnswer[]): string => {
+  const generateAggregatedComment = useCallback((_zone: Zone, objects: DetectedObject[], answers: QuestionAnswer[]): string => {
     const comments: string[] = [];
     
     // Summarize detected objects

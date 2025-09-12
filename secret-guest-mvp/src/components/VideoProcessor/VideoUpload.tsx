@@ -29,7 +29,7 @@ const VideoUpload: React.FC<VideoUploadProps> = ({
     }
 
     // Check file format
-    if (!VIDEO_CONSTRAINTS.supportedFormats.includes(file.type)) {
+    if (!VIDEO_CONSTRAINTS.supportedFormats.includes(file.type as any)) {
       return ERROR_MESSAGES.upload.invalidFormat;
     }
 
