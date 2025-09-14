@@ -110,9 +110,11 @@ export type ProcessingStage =
 
 // Frame extraction result
 export interface FrameData {
-  index: number;
+  id?: string;
+  index?: number;
   timestamp: number;
-  base64Data: string;
+  base64Data?: string;
+  dataUrl?: string;
   width: number;
   height: number;
 }

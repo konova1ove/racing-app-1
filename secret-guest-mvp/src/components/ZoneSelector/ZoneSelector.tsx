@@ -62,7 +62,7 @@ const ZoneSelector: React.FC<ZoneSelectorProps> = ({
               Вопросы для оценки:
             </h4>
             <ul className="space-y-1">
-              {zone.questions.map((question, index) => (
+              {zone.questions.map((question) => (
                 <li key={question.id} className="text-xs text-gray-600 flex items-start">
                   <span className="text-primary-500 mr-2 mt-1">•</span>
                   <span>{question.text}</span>

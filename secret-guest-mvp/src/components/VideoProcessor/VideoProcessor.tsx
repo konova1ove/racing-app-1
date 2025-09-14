@@ -1,11 +1,13 @@
 import React, { useState, useCallback, useRef } from 'react';
 import type { Zone, AssessmentResult, ProcessingStage, FrameData, DetectedObject } from '../../types';
-import { VIDEO_CONSTRAINTS, ERROR_MESSAGES } from '../../constants';
+import { ERROR_MESSAGES } from '../../constants';
 import VideoUpload from './VideoUpload';
+import LiveVisionAnalysis from './LiveVisionAnalysis';
 import FrameExtractor from './FrameExtractor';
 import VisionAnalyzer from './VisionAnalyzer';
 import ScoringEngine from './ScoringEngine';
 import ProcessingProgress from './ProcessingProgress';
+import { Camera, Upload } from 'lucide-react';
 
 interface VideoProcessorProps {
   zone: Zone;
@@ -17,6 +19,8 @@ interface VideoProcessorProps {
   className?: string;
 }
 
+type CaptureMode = 'live' | 'upload';
+
 const VideoProcessor: React.FC<VideoProcessorProps> = ({
   zone,
   onProcessingComplete,
@@ -26,6 +30,7 @@ const VideoProcessor: React.FC<VideoProcessorProps> = ({
   onError,
   className = ''
 }) => {
+  const [captureMode, setCaptureMode] = useState<CaptureMode>('live');
   const [videoFile, setVideoFile] = useState<File | null>(null);
   const [extractedFrames, setExtractedFrames] = useState<FrameData[]>([]);
   const [detectedObjects, setDetectedObjects] = useState<DetectedObject[]>([]);
@@ -35,6 +40,9 @@ const VideoProcessor: React.FC<VideoProcessorProps> = ({
   const [processingStartTime, setProcessingStartTime] = useState<number>(0);
 
   const abortControllerRef = useRef<AbortController | null>(null);
+
+  // Detect if device is mobile
+  const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
 
   // Update processing stage
   const updateStage = useCallback((stage: ProcessingStage, progressValue?: number) => {
@@ -54,10 +62,25 @@ const VideoProcessor: React.FC<VideoProcessorProps> = ({
     updateStage('idle');
   }, [updateStage]);
 
+  // Handle live video frames
+  const handleFrameCapture = useCallback((frames: string[]) => {
+    // Convert base64 frames to FrameData format
+    const frameData: FrameData[] = frames.map((frame, index) => ({
+      id: `frame-${index}`,
+      timestamp: index,
+      dataUrl: frame,
+      width: 640,
+      height: 480
+    }));
+    
+    setExtractedFrames(frameData);
+    setVideoFile(null); // Clear video file since we're using live frames
+  }, []);
+
   // Start processing pipeline
   const startProcessing = useCallback(async () => {
-    if (!videoFile) {
-      onError('Видео файл не выбран');
+    if (!videoFile && extractedFrames.length === 0) {
+      onError('Видео или кадры не выбраны');
       return;
     }
 
@@ -67,14 +90,20 @@ const VideoProcessor: React.FC<VideoProcessorProps> = ({
     abortControllerRef.current = new AbortController();
 
     try {
-      updateStage('extracting_frames', 10);
+      if (extractedFrames.length > 0) {
+        // We already have frames from live capture, proceed to analysis
+        updateStage('analyzing_frames', 30);
+      } else {
+        // Extract frames from uploaded video file
+        updateStage('extracting_frames', 10);
+      }
     } catch (error) {
       console.error('Processing error:', error);
       onError(error instanceof Error ? error.message : ERROR_MESSAGES.processing.unexpectedError);
       setIsProcessing(false);
       updateStage('error');
     }
-  }, [videoFile, onProcessingStart, onError, updateStage]);
+  }, [videoFile, extractedFrames, onProcessingStart, onError, updateStage]);
 
   // Handle frames extracted
   const handleFramesExtracted = useCallback(async (frames: FrameData[]) => {
@@ -147,7 +176,7 @@ const VideoProcessor: React.FC<VideoProcessorProps> = ({
             Вопросы для автоматической оценки:
           </h3>
           <ul className="space-y-2">
-            {zone.questions.map((question, index) => (
+            {zone.questions.map((question) => (
               <li key={question.id} className="text-sm text-gray-600 flex items-start">
                 <span className="text-blue-500 mr-2 mt-0.5">•</span>
                 <span>{question.text}</span>
@@ -156,6 +185,54 @@ const VideoProcessor: React.FC<VideoProcessorProps> = ({
           </ul>
         </div>
       </div>
+
+      {/* Capture Mode Selector */}
+      {!isProcessing && (
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">
+            Выберите способ записи
+          </h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <button
+              onClick={() => setCaptureMode('live')}
+              className={`p-4 rounded-lg border-2 transition-colors ${
+                captureMode === 'live'
+                  ? 'border-blue-500 bg-blue-50'
+                  : 'border-gray-200 hover:border-gray-300'
+              }`}
+            >
+              <div className="flex flex-col items-center text-center">
+                <Camera className={`w-8 h-8 mb-2 ${
+                  captureMode === 'live' ? 'text-blue-600' : 'text-gray-500'
+                }`} />
+                <h4 className="font-medium text-gray-900">Прямая съемка</h4>
+                <p className="text-sm text-gray-600 mt-1">
+                  {isMobile ? 'Рекомендуется для мобильных устройств' : 'Съемка в реальном времени'}
+                </p>
+              </div>
+            </button>
+            
+            <button
+              onClick={() => setCaptureMode('upload')}
+              className={`p-4 rounded-lg border-2 transition-colors ${
+                captureMode === 'upload'
+                  ? 'border-blue-500 bg-blue-50'
+                  : 'border-gray-200 hover:border-gray-300'
+              }`}
+            >
+              <div className="flex flex-col items-center text-center">
+                <Upload className={`w-8 h-8 mb-2 ${
+                  captureMode === 'upload' ? 'text-blue-600' : 'text-gray-500'
+                }`} />
+                <h4 className="font-medium text-gray-900">Загрузка файла</h4>
+                <p className="text-sm text-gray-600 mt-1">
+                  Загрузить готовое видео
+                </p>
+              </div>
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Processing Progress */}
       {isProcessing && (
@@ -166,8 +243,18 @@ const VideoProcessor: React.FC<VideoProcessorProps> = ({
         />
       )}
 
+      {/* Live Vision Analysis */}
+      {!isProcessing && captureMode === 'live' && (
+        <LiveVisionAnalysis
+          onFrameCapture={handleFrameCapture}
+          onStartProcessing={startProcessing}
+          disabled={isProcessing}
+          zone={zone}
+        />
+      )}
+
       {/* Video Upload */}
-      {!isProcessing && (
+      {!isProcessing && captureMode === 'upload' && (
         <VideoUpload
           onVideoSelect={handleVideoSelect}
           selectedFile={videoFile}
@@ -190,7 +277,6 @@ const VideoProcessor: React.FC<VideoProcessorProps> = ({
       {extractedFrames.length > 0 && isProcessing && currentStage === 'analyzing_frames' && (
         <VisionAnalyzer
           frames={extractedFrames}
-          zone={zone}
           onAnalysisComplete={handleAnalysisComplete}
           onProgress={(progress) => setProgress(30 + progress * 0.4)}
           onError={onError}

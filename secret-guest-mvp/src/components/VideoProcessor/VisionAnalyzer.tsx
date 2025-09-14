@@ -1,7 +1,7 @@
 import React, { useEffect, useCallback, useRef, useState } from 'react';
 import axios from 'axios';
-import type { Zone, FrameData, DetectedObject, RoboflowResponse } from '../../types';
-import { ROBOFLOW_CONFIG, API_ENDPOINTS, ERROR_MESSAGES } from '../../constants';
+import type { FrameData, DetectedObject, RoboflowResponse } from '../../types';
+import { ROBOFLOW_CONFIG, ERROR_MESSAGES } from '../../constants';
 
 interface VisionAnalyzerProps {
   frames: FrameData[];
@@ -120,7 +120,12 @@ const VisionAnalyzer: React.FC<VisionAnalyzerProps> = ({
     const apiUrl = `${ROBOFLOW_CONFIG.baseURL}${modelEndpoint}`;
 
     // Convert base64 to blob
-    const response = await fetch(`data:image/png;base64,${frame.base64Data}`);
+    const imageData = frame.base64Data || frame.dataUrl;
+    if (!imageData) {
+      throw new Error('No image data available in frame');
+    }
+    
+    const response = await fetch(imageData.startsWith('data:') ? imageData : `data:image/png;base64,${imageData}`);
     const blob = await response.blob();
 
     // Create form data
@@ -147,7 +152,7 @@ const VisionAnalyzer: React.FC<VisionAnalyzerProps> = ({
       if (axios.isAxiosError(error)) {
         if (error.response?.status === 429) {
           throw new Error(ERROR_MESSAGES.api.rateLimitExceeded);
-        } else if (error.response?.status >= 500) {
+        } else if (error.response && error.response.status >= 500) {
           throw new Error(ERROR_MESSAGES.api.serverError);
         } else if (error.code === 'ECONNABORTED') {
           throw new Error(ERROR_MESSAGES.processing.timeout);
