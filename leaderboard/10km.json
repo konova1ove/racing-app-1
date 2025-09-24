@@ -1,0 +1,20 @@
+[
+  {
+    "rank": 1,
+    "userId": "demo1",
+    "username": "SpeedDemon 🏎️",
+    "score": 2850,
+    "accuracy": 95,
+    "distance": 8.5,
+    "date": "2024-01-15T10:30:00Z"
+  },
+  {
+    "rank": 2,
+    "userId": "demo2", 
+    "username": "RoadRunner 🏃",
+    "score": 2720,
+    "accuracy": 92,
+    "distance": 7.2,
+    "date": "2024-01-15T09:15:00Z"
+  }
+]
